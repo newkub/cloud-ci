@@ -1,0 +1,9 @@
+node_modules/
+dist/
+web/dist/
+.wrangler/
+.dev.vars
+.bun-cache/
+*.tsbuildinfo
+.wrangler
+cache/

@@ -6,6 +6,7 @@ import {
   type SourceControlAdapter,
 } from '@cloudflare/ci/worker/source-control';
 import type { Bindings } from '../../env';
+import type { RunRegistry } from '../registry';
 import { resolveHealingCwd } from './cwd';
 import { inspectHealingChanges, pushFixBranch } from './push';
 import {
@@ -17,6 +18,7 @@ import { sandboxTools, type HealingSandbox } from './tools';
 import type { HealInput, HealResult, VerificationCommand } from './types';
 
 const MAX_CHANGED_PATHS = 100;
+const REGISTRY_NAME = 'global';
 const PIPELINE_VERIFY_TIMEOUT_MS = 10 * 60 * 1000;
 const VERIFY_OUTPUT_LIMIT = 20_000;
 const DEFAULT_PROVIDER = cloudflareArtifacts();
@@ -44,6 +46,7 @@ export class HealingAgent extends Think<Bindings> {
   private failedCommands: VerificationCommand[] = [];
   private steps = 0;
   private healing = false;
+  private activeRunId: string | undefined;
   private mutationQueue: Promise<void> = Promise.resolve();
 
   override getSystemPrompt() {
@@ -100,6 +103,22 @@ export class HealingAgent extends Think<Bindings> {
 
   override onStepFinish() {
     this.steps += 1;
+    const runId = this.activeRunId;
+    if (runId) {
+      this.ctx.waitUntil(
+        this.registry()
+          .recordHealProgress({ runId, steps: this.steps })
+          .catch((error: unknown) => {
+            console.error('Failed to record heal progress', { error });
+          })
+      );
+    }
+  }
+
+  private registry() {
+    return this.env.REGISTRY.get(
+      this.env.REGISTRY.idFromName(REGISTRY_NAME)
+    ) as DurableObjectStub<RunRegistry>;
   }
 
   protected getProvider(): SourceControlAdapter {
@@ -121,11 +140,50 @@ export class HealingAgent extends Think<Bindings> {
     }
     this.healing = true;
     this.steps = 0;
+    this.activeRunId = failure.runId;
+    await this.registry()
+      .recordHealStart({ runId: failure.runId })
+      .catch((error: unknown) => {
+        console.error('Failed to record heal start', { error });
+      });
 
     try {
-      return await this.runHeal(failure, prompt);
+      const result = await this.runHeal(failure, prompt);
+      await this.registry()
+        .recordHealFinish({
+          runId: failure.runId,
+          status: 'pushed',
+          steps: this.steps,
+          branch: result.branch,
+          commit: result.commit,
+          ...(result.pullRequest.status === 'created'
+            ? {
+                prUrl: result.pullRequest.url,
+                ...(result.pullRequest.number === undefined
+                  ? {}
+                  : { prNumber: result.pullRequest.number }),
+              }
+            : {}),
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to record heal finish', { error });
+        });
+      return result;
+    } catch (error) {
+      await this.registry()
+        .recordHealFinish({
+          runId: failure.runId,
+          status: 'failed',
+          steps: this.steps,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .catch((recordError: unknown) => {
+          console.error('Failed to record heal failure', { recordError });
+        });
+      throw error;
     } finally {
       this.healing = false;
+      this.activeRunId = undefined;
       this.sandbox = undefined;
       this.failedCommands = [];
     }

@@ -7,6 +7,8 @@
     "isolatedModules": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "noEmit": true,
     "skipLibCheck": true,
     "strict": true,
@@ -16,6 +18,9 @@
     "src/**/*.ts",
     "cloudflare.ci.ts",
     "env.ts",
-    "worker-configuration.d.ts"
+    "worker-configuration.d.ts",
+    "web/src/**/*.ts",
+    "web/src/**/*.tsx",
+    "web/*.ts"
   ]
 }

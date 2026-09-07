@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => ({
   openPushSandbox: vi.fn(),
   inspectHealingChanges: vi.fn(),
   pushFixBranch: vi.fn(),
+  registry: {
+    recordHealStart: vi.fn().mockResolvedValue(true),
+    recordHealProgress: vi.fn().mockResolvedValue(true),
+    recordHealFinish: vi.fn().mockResolvedValue(true),
+  },
 }));
 
 vi.mock('@cloudflare/think', () => ({
@@ -39,6 +44,15 @@ vi.mock('./push', () => ({
 import { HealingAgent } from './healer';
 import type { HealFailure } from './types';
 
+function env(): Bindings {
+  return fromPartial<Bindings>({
+    REGISTRY: fromPartial<DurableObjectNamespace>({
+      idFromName: vi.fn().mockReturnValue('registry-id'),
+      get: vi.fn().mockReturnValue(mocks.registry),
+    }),
+  });
+}
+
 const failure: HealFailure = {
   runId: 'run-1',
   source: {
@@ -50,18 +64,18 @@ const failure: HealFailure = {
   baseBranch: 'main',
   failures: [
     {
-      runner: { name: 'test', command: 'npm run test' },
+      runner: { name: 'test', command: 'bun run test' },
       output: 'assertion failed',
     },
     {
-      runner: { name: 'lint', command: 'npm run lint', cwd: 'apps/example' },
+      runner: { name: 'lint', command: 'bun run lint', cwd: 'apps/example' },
       output: 'lint failed',
     },
   ],
   snapshot: { id: 'snapshot-1', dir: '/workspace' },
   verificationCommands: [
-    { command: 'npm run test' },
-    { command: 'npm run lint', cwd: 'apps/example' },
+    { command: 'bun run test' },
+    { command: 'bun run lint', cwd: 'apps/example' },
   ],
 };
 
@@ -111,8 +125,10 @@ describe('HealingAgent', () => {
       }
     }
     const healer = new Healer(
-      fromPartial<DurableObjectState>({}),
-      fromPartial<Bindings>({})
+      fromPartial<DurableObjectState>({
+        waitUntil: vi.fn(),
+      }),
+      env()
     );
     mocks.saveMessages.mockImplementationOnce(async () => {
       const execute = healer.getTools().exec?.execute;
@@ -128,9 +144,9 @@ describe('HealingAgent', () => {
       expect(toolResult).toMatchObject({
         allPassed: true,
         verification: [
-          { command: 'npm run test', exitCode: 0 },
+          { command: 'bun run test', exitCode: 0 },
           {
-            command: 'npm run lint',
+            command: 'bun run lint',
             cwd: 'apps/example',
             exitCode: 0,
           },
@@ -173,11 +189,11 @@ describe('HealingAgent', () => {
       cwd: '/workspace',
       timeout: 1_000,
     });
-    expect(healingExec).toHaveBeenNthCalledWith(2, 'npm run test', {
+    expect(healingExec).toHaveBeenNthCalledWith(2, 'bun run test', {
       cwd: '/workspace',
       timeout: 600_000,
     });
-    expect(healingExec).toHaveBeenNthCalledWith(3, 'npm run lint', {
+    expect(healingExec).toHaveBeenNthCalledWith(3, 'bun run lint', {
       cwd: '/workspace/apps/example',
       timeout: 600_000,
     });
@@ -211,12 +227,14 @@ describe('HealingAgent', () => {
       }
     }
     const healer = new Healer(
-      fromPartial<DurableObjectState>({}),
-      fromPartial<Bindings>({})
+      fromPartial<DurableObjectState>({
+        waitUntil: vi.fn(),
+      }),
+      env()
     );
 
     await expect(healer.heal({ failure })).rejects.toThrow(
-      'Heal Attempt failed pipeline verification npm run test\nstill failing'
+      'Heal Attempt failed pipeline verification bun run test\nstill failing'
     );
     expect(getPushCredentials).not.toHaveBeenCalled();
     expect(mocks.openPushSandbox).not.toHaveBeenCalled();
