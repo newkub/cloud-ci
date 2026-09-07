@@ -83,3 +83,21 @@ BUILDAH_FORMAT="docker"   # push docker-format manifests to registry.cloudflare.
 `https://forms.gle/DwBoPRa3CWQ8ajFp7` before deploy/staging can succeed.
 The `artifacts` binding + `cf.artifacts.repo.pushed` trigger are core to
 this product and cannot be removed.
+
+**Containers** also requires the **Workers Paid plan** (account is on Free):
+`wrangler containers list` returns
+`Unauthorized: You do not have access to Cloudflare Containers`.
+
+## Staging
+
+`wrangler.staging.jsonc` is a dashboard-only config for the current Free
+plan — it drops `artifacts`, `triggers.events`, `containers`, and the
+`SANDBOX` DO. Deploy with:
+
+```sh
+bunx wrangler deploy -c wrangler.staging.jsonc
+```
+
+Live at `https://cloud-ci-staging.newkubise.workers.dev` — `/health`,
+`/rpc/*` (RunRegistry DO), and the SPA all work; CI/heal paths stay inert
+until Artifacts + Paid plan are enabled.

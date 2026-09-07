@@ -1,0 +1,69 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Staging config — dashboard-only deploy for accounts without
+  // Workers Paid (Containers) and Artifacts (closed beta) access.
+  // Removed vs wrangler.jsonc: artifacts binding, triggers.events,
+  // containers, SANDBOX DO (container-backed).
+  "name": "cloud-ci-staging",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+  },
+  "ai": {
+    "binding": "AI",
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "HEALER",
+        "class_name": "Healer",
+      },
+      {
+        "name": "REGISTRY",
+        "class_name": "RunRegistry",
+      },
+    ],
+  },
+  "workflows": [
+    {
+      "name": "cloud-ci",
+      "binding": "CI_WORKFLOW",
+      "class_name": "CI",
+    },
+  ],
+  "exports": {
+    "Healer": {
+      "type": "durable-object",
+      "storage": "sqlite",
+    },
+    "RunRegistry": {
+      "type": "durable-object",
+      "storage": "sqlite",
+    },
+  },
+  "r2_buckets": [
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "cloud-ci-backups",
+      "preview_bucket_name": "cloud-ci-backups",
+    },
+  ],
+  "vars": {
+    "BACKUP_BUCKET_NAME": "cloud-ci-backups",
+    "WATCH_NAMESPACE": "cloud-ci",
+    "WATCH_REPO": "cloud-ci",
+    "CLOUDFLARE_ACCOUNT_ID": "384988241a425d49c5980f2b87b842c9",
+    "CLOUDFLARE_DEPLOY_ACCOUNT_ID": "384988241a425d49c5980f2b87b842c9",
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+    },
+  },
+}
