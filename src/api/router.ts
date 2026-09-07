@@ -64,8 +64,8 @@ const listRuns = base
 
 const getRun = base
   .input(z.object({ id: z.string().min(1).max(200) }))
-  .handler(({ input, context }) => {
-    const run = registry(context.env).getRun({ id: input.id });
+  .handler(async ({ input, context }) => {
+    const run = await registry(context.env).getRun({ id: input.id });
     if (!run) {
       throw new ORPCError('NOT_FOUND', { message: `Run ${input.id} not found` });
     }
@@ -86,8 +86,8 @@ const listHeals = base
 
 const getHeal = base
   .input(z.object({ runId: z.string().min(1).max(200) }))
-  .handler(({ input, context }) => {
-    const heal = registry(context.env).getHeal({ runId: input.runId });
+  .handler(async ({ input, context }) => {
+    const heal = await registry(context.env).getHeal({ runId: input.runId });
     if (!heal) {
       throw new ORPCError('NOT_FOUND', {
         message: `Heal attempt for run ${input.runId} not found`,
