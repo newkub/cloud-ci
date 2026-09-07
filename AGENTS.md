@@ -50,3 +50,36 @@ bun run deploy      # build + wrangler deploy (production — confirm first)
 
 Required before deploy: `CF_TOKEN`, `R2_ACCESS_KEY_ID`,
 `R2_SECRET_ACCESS_KEY` — see `.dev.vars.example`.
+
+## Container runtime (Windows)
+
+Docker Desktop is not installed — **Podman 6.1** (WSL provider) is the
+container runtime. `C:` had no free space, so the machine store is a
+junction: `C:\Users\Veerapong\.local\share\containers\podman\machine` →
+`D:\pm`.
+
+- `podman machine init` fails to pull the machine OS from quay.io on this
+  machine — download the matching WSL rootfs manually from
+  `github.com/podman-container-tools/podman-machine-os/releases` (asset
+  `podman-machine.x86_64.wsl.tar.zst`) and run
+  `podman machine init --image <path-to-tar.zst>`.
+- Wrangler container builds need these env vars:
+
+```sh
+WRANGLER_DOCKER_BIN="C:\Users\Veerapong\AppData\Local\Programs\Podman\podman.exe"
+DOCKER_HOST="npipe:////./pipe/docker_engine"
+BUILDAH_FORMAT="docker"   # push docker-format manifests to registry.cloudflare.com
+```
+
+- `wrangler dev` does not support local containers on Windows — use
+  `bun run dev:mock` for the dashboard and deploy to test remotely.
+
+## Deploy blocker
+
+`bunx wrangler deploy` fails at Worker upload with
+`code: 10015 — You do not have access to use Artifacts`.
+**Artifacts is in closed beta** — request access for account
+`384988241a425d49c5980f2b87b842c9` via
+`https://forms.gle/DwBoPRa3CWQ8ajFp7` before deploy/staging can succeed.
+The `artifacts` binding + `cf.artifacts.repo.pushed` trigger are core to
+this product and cannot be removed.
